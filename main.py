@@ -103,23 +103,23 @@ def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_
     else:
         story.append(Paragraph(f"<b>Total HT : {amount} €</b><br/><b>TVA : </b> {tva} % <br/><b>Total TTC : {amount*(1+tva/100):.02f} €</b>", styles["Normal"]))
     story.append(Spacer(1, 4)) 
-    story.append(HRFlowable(width="100%"))
-    story.append(Spacer(1, 4))
+    if is_paid.lower() != "acquitée":
+        story.append(HRFlowable(width="100%"))
+        story.append(Spacer(1, 4))
 
-    # Payment conditions (simulated list)
-    story.append(Paragraph("<b>Condition de règlement :</b>", styles["Normal"]))
-    story.append(Paragraph("• Paiement à effectuer sous 7 jours", indented_style))
-    story.append(Paragraph("• Par virement bancaire à :", indented_style))
-    story.append(Paragraph("<b>Titulaire du compte :</b> O2C<br/>\t<b>IBAN :</b> FR76 1820 6001 4165 1145 6046 908<br/>\t<b>BIC :</b> AGRIFRPP882", double_indented_style))
-    story.append(Spacer(1, 100))
+        story.append(Paragraph("<b>Condition de règlement :</b>", styles["Normal"]))
+        story.append(Paragraph("• Paiement à effectuer sous 7 jours", indented_style))
+        story.append(Paragraph("• Par virement bancaire à :", indented_style))
+        story.append(Paragraph("<b>Titulaire du compte :</b> O2C<br/>\t<b>IBAN :</b> FR76 1820 6001 4165 1145 6046 908<br/>\t<b>BIC :</b> AGRIFRPP882", double_indented_style))
+        story.append(Spacer(1, 100))
 
-    # Penalties
-    story.append(Paragraph(
-        "<b>Pénalités de retard :</b> En cas de retard de paiement et de versement des sommes dues par le Client au-delà des délais ci-dessus fixés, "
-        "et après la date de paiement figurant sur la facture adressée à celui-ci, des pénalités de retard calculées au taux légal applicable au montant "
-        "TTC du prix d'acquisition figurant sur ladite facture, seront acquises automatiquement et de plein droit au Prestataire, sans formalité aucune "
-        "ni mise en demeure préalable.", styles["Normal"]
-    ))
+        # Penalties
+        story.append(Paragraph(
+            "<b>Pénalités de retard :</b> En cas de retard de paiement et de versement des sommes dues par le Client au-delà des délais ci-dessus fixés, "
+            "et après la date de paiement figurant sur la facture adressée à celui-ci, des pénalités de retard calculées au taux légal applicable au montant "
+            "TTC du prix d'acquisition figurant sur ladite facture, seront acquises automatiquement et de plein droit au Prestataire, sans formalité aucune "
+            "ni mise en demeure préalable.", styles["Normal"]
+        ))
 
     # Build PDF
     doc.build(story)
@@ -250,7 +250,7 @@ def send_email():
     col1, col2, col3 = st.columns([1,1,1])
 
     with col1:
-        is_paid = st.radio("La facture est :", ["Acquitée", "A payer"], horizontal=True)
+        is_paid = st.radio("La facture est :", ["A payer", "Acquitée"], index=0, horizontal=True)
     with col2:
         first_day = now.replace(day=1)
         formatted = first_day.strftime("%d/%m/%Y")
@@ -282,7 +282,23 @@ def send_email():
         st.session_state["created"] = True
 
     if st.button(f"Envoi de la facture à : {email}", disabled=(not st.session_state["created"]), use_container_width=True):
+
+        months_written = {
+            1: "janvier",
+            2: "février",
+            3: "mars",
+            4: "avril",
+            5: "mai",
+            6: "juin",
+            7: "juillet",
+            8: "août",
+            9: "septembre",
+            10: "octobre",
+            11: "novembre",
+            12: "décembre"
+        }
         pdf_name = "facture_2025_6.pdf"
+        paid = "à payer" if is_paid.lower()=="a payer" else "acquitée"
 
         month_year = now.strftime("%m/%Y")
         try:
@@ -290,7 +306,7 @@ def send_email():
             msg["Subject"] = f"Facture {month_year}"
             msg["From"] = "no_reply@o2c.io"
             msg["To"] = email
-            msg.set_content("This is a test email sent from Python.")
+            msg.set_content(f"Bonjour, \nVoici la facture {paid} pour le mois de {months_written[date.today().month]}.\nBien à vous.\nL'équipe d'O2C")
 
             with open("factures/" + pdf_name, "rb") as f:
                 file_data = f.read()
@@ -308,6 +324,7 @@ def send_email():
                 server.send_message(msg)
             
             st.session_state["sent"] = True
+            st.rerun()
 
 
         except Exception as e:
