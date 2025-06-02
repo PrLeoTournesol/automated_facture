@@ -302,10 +302,14 @@ def send_email():
 
         month_year = now.strftime("%m/%Y")
         try:
+            contact_email = st.secrets["o2c_email"]
+            password = st.secrets["o2c_password"]
+            no_reply_email = st.secrets["o2c_no_reply_email"]
+
             msg = EmailMessage()
             msg["Subject"] = f"Facture {month_year}"
-            msg["From"] = "no_reply@o2c.io"
-            msg["To"] = email
+            msg["From"] = no_reply_email
+            msg["To"] = email + " " + contact_email
             msg.set_content(f"Bonjour, \nVoici la facture {paid} pour le mois de {months_written[date.today().month]}.\nBien à vous.\nL'équipe d'O2C")
 
             with open("factures/" + pdf_name, "rb") as f:
@@ -315,12 +319,9 @@ def send_email():
             smtp_server = "smtp.hostinger.com"
             smtp_port = 587
 
-            your_email = "contact@o2c.io"
-            your_password = "$t3xup3rYde53rt" 
-
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()  # Start TLS encryption
-                server.login(your_email, your_password)
+                server.login(contact_email, password)
                 server.send_message(msg)
             
             st.session_state["sent"] = True
