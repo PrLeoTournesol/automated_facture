@@ -1,0 +1,7 @@
+streamlit
+streamlit_pdf_viewer
+pandas
+numpy
+reportlab
+sendgrid
+Pillow
