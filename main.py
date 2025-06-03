@@ -7,7 +7,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 import smtplib
 from email.message import EmailMessage
-
+import shutil
 
 now = date.today()
 
@@ -36,8 +36,11 @@ def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_
 
     year = now.year
     month = now.month
+    
+    emission_date_formated = emission_date.replace("/","-")
+    name_formated = name.lower().replace(" ", "_")
 
-    doc = SimpleDocTemplate(f"factures/facture_{year}_{month}.pdf")
+    doc = SimpleDocTemplate(f"to_send/facture_{year}_{month}.pdf")
     styles = getSampleStyleSheet()
     story = []
 
@@ -113,7 +116,6 @@ def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_
         story.append(Paragraph("<b>Titulaire du compte :</b> O2C<br/>\t<b>IBAN :</b> FR76 1820 6001 4165 1145 6046 908<br/>\t<b>BIC :</b> AGRIFRPP882", double_indented_style))
         story.append(Spacer(1, 100))
 
-        # Penalties
         story.append(Paragraph(
             "<b>Pénalités de retard :</b> En cas de retard de paiement et de versement des sommes dues par le Client au-delà des délais ci-dessus fixés, "
             "et après la date de paiement figurant sur la facture adressée à celui-ci, des pénalités de retard calculées au taux légal applicable au montant "
@@ -121,8 +123,13 @@ def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_
             "ni mise en demeure préalable.", styles["Normal"]
         ))
 
-    # Build PDF
     doc.build(story)
+
+    archive_path = f"factures/O2C_facture({str(facture_number).zfill(3)})_{name_formated}_{emission_date_formated}.pdf"
+    built_path = f"to_send/facture_{year}_{month}.pdf"
+
+
+    shutil.copy2(built_path, archive_path)
 
     return f"facture_{year}_{month}.pdf"
 
@@ -277,7 +284,7 @@ def send_email():
 
         col1, col2, col3 = st.columns([1, 2.5, 1])
         with col2:
-            pdf_viewer(input="factures/"+pdf_name, width=700)
+            pdf_viewer(input="to_send/"+pdf_name, width=700)
         
         st.session_state["created"] = True
 
@@ -309,10 +316,10 @@ def send_email():
             msg = EmailMessage()
             msg["Subject"] = f"Facture {month_year}"
             msg["From"] = no_reply_email
-            msg["To"] = email + " " + contact_email
+            msg["To"] = email
             msg.set_content(f"Bonjour, \nVoici la facture {paid} pour le mois de {months_written[date.today().month]}.\nBien à vous.\nL'équipe d'O2C")
 
-            with open("factures/" + pdf_name, "rb") as f:
+            with open("to_send/" + pdf_name, "rb") as f:
                 file_data = f.read()
                 msg.add_attachment(file_data, maintype="application", subtype="pdf", filename=pdf_name)
 
@@ -341,24 +348,46 @@ def remove_user():
     with open("users.json", "r") as f:
         users_data = json.load(f) 
 
-    st.write("Choisir un utilisateur à supprimer :")
-    col1, col2 = st.columns([3,1])
+    if len(users_data.keys()) == 1:
+        st.error('Vous ne pouvez pas supprimer le dernier utilisateur de la liste')
+        st.write("Choisir un utilisateur à supprimer :")
+        col1, col2 = st.columns([3,1])
 
-    with col1:
-        user_options = {users_data[user]["name"] : user for user in users_data.keys()} 
-        selected_name = st.selectbox("fregb", list(user_options.keys()), label_visibility='collapsed')
-        selected_user = user_options[selected_name]
+        with col1:
+            user_options = {users_data[user]["name"] : user for user in users_data.keys()} 
+            selected_name = st.selectbox("fregb", list(user_options.keys()), label_visibility='collapsed', disabled=True)
+            selected_user = user_options[selected_name]
 
-    with col2:
-        remove_but = st.button("Supprimer l'utilisateur", use_container_width=True)
-        if remove_but:
-            users_data.pop(selected_user)
+        with col2:
+            remove_but = st.button("Supprimer l'utilisateur", use_container_width=True, disabled=True)
+            if remove_but:
+                users_data.pop(selected_user)
 
-            with open("users.json", "w") as f:
-                json.dump(users_data, f, indent=4)
-                
-            st.session_state["removed"] = True
-            st.rerun()
+                with open("users.json", "w") as f:
+                    json.dump(users_data, f, indent=4)
+                    
+                st.session_state["removed"] = True
+                st.rerun()
+
+    else:
+        st.write("Choisir un utilisateur à supprimer :")
+        col1, col2 = st.columns([3,1])
+
+        with col1:
+            user_options = {users_data[user]["name"] : user for user in users_data.keys()} 
+            selected_name = st.selectbox("fregb", list(user_options.keys()), label_visibility='collapsed')
+            selected_user = user_options[selected_name]
+
+        with col2:
+            remove_but = st.button("Supprimer l'utilisateur", use_container_width=True)
+            if remove_but:
+                users_data.pop(selected_user)
+
+                with open("users.json", "w") as f:
+                    json.dump(users_data, f, indent=4)
+                    
+                st.session_state["removed"] = True
+                st.rerun()
 
 
 tab1, tab2, tab3 = st.tabs([
