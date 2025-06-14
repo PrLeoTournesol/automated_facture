@@ -8,6 +8,7 @@ from reportlab.lib.enums import TA_CENTER
 import smtplib
 from email.message import EmailMessage
 import shutil
+import base64
 
 now = date.today()
 
@@ -32,7 +33,7 @@ if "removed" not in st.session_state:
 st.title("Outil d'envoi automatique de facture")
 st.markdown("---")
 
-def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_association, amount, tva, now):
+def create_pdf(is_paid, id_user, facture_number, emission_date, name, address, email, is_association, amount, tva, now):
 
     year = now.year
     month = now.month
@@ -64,7 +65,7 @@ def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_
     story.append(Spacer(1, 100))
 
     # Invoice info
-    story.append(Paragraph(f"<b>Facture N° :</b> {year}{str(facture_number).zfill(3)}<br/><b>Date d'émission :</b> {emission_date}", styles["Normal"]))
+    story.append(Paragraph(f"<b>Facture N° :</b> {year}{str(facture_number).zfill(3)}{id_user}<br/><b>Date d'émission :</b> {emission_date}", styles["Normal"]))
     story.append(Spacer(1, 4))
     story.append(HRFlowable(width="100%"))
     story.append(Spacer(1, 4))
@@ -125,7 +126,7 @@ def create_pdf(is_paid, facture_number, emission_date, name, address, email, is_
 
     doc.build(story)
 
-    archive_path = f"factures/O2C_facture({str(facture_number).zfill(3)})_{name_formated}_{emission_date_formated}.pdf"
+    archive_path = f"factures/O2C_facture_{year}{str(facture_number).zfill(3)}{id_user}_{name_formated}_{emission_date_formated}.pdf"
     built_path = f"to_send/facture_{year}_{month}.pdf"
 
 
@@ -166,7 +167,7 @@ def add_user():
             if not email:
                 st.error("Merci d'entrer une adresse email valide.")
             else:
-                users_data[email] = {"facture_number": 1, "name": name, "address": address, "amount": amount, "TVA": tva/100, "is_association": is_association}
+                users_data[email] = {"id_user": len(users_data)+1,"facture_number": 1, "name": name, "address": address, "amount": amount, "TVA": tva/100, "is_association": is_association}
                 
                 with open("users.json", "w") as f:
                     json.dump(users_data, f, indent=4)
@@ -199,6 +200,8 @@ def send_email():
     user_options = {users_data[user]["name"] : user for user in users_data.keys()} 
     selected_name = st.selectbox("Choisir un utilisateur :", list(user_options.keys()))
     selected_user = user_options[selected_name]
+
+    id_user = users_data[selected_user]["id_user"]
 
     st.session_state.facture_number = users_data[selected_user]["facture_number"]
     
@@ -242,7 +245,7 @@ def send_email():
                 if email != st.session_state.email:
                     users_data[email] = users_data.pop(st.session_state.email)
 
-                users_data[email] = {"facture_number": facture_number, "name": name, "address": address, "amount": amount, "TVA": tva/100, "is_association": is_association}
+                users_data[email] = {"id_user": id_user, "facture_number": facture_number, "name": name, "address": address, "amount": amount, "TVA": tva/100, "is_association": is_association}
                 
                 with open("users.json", "w") as f:
                     json.dump(users_data, f, indent=4)
@@ -275,16 +278,21 @@ def send_email():
         edit_facture = st.button("Edition de la facture")
     
     if edit_facture:
-        pdf_name = create_pdf(is_paid, facture_number, emission_date, name, address, email, is_association, amount, tva, now)
+        pdf_name = create_pdf(is_paid, id_user, facture_number, emission_date, name, address, email, is_association, amount, tva, now)
         
-        users_data[email] = {"facture_number": facture_number+1, "name": name, "address": address, "amount": amount, "TVA": tva/100, "is_association": is_association}
+        users_data[email] = {"id_user": id_user, "facture_number": facture_number+1, "name": name, "address": address, "amount": amount, "TVA": tva/100, "is_association": is_association}
         
         with open("users.json", "w") as f:
             json.dump(users_data, f, indent=4)
 
         col1, col2, col3 = st.columns([1, 2.5, 1])
         with col2:
-            pdf_viewer(input="to_send/"+pdf_name, width=700)
+            with open("to_send/"+pdf_name, 'rb') as f:
+                binary_pdf = base64.b64encode(f.read()).decode('utf-8')
+
+            pdf_display = f'<embed src="data:application/pdf;base64,{binary_pdf}" width="700" height="1000" type="application/pdf">'
+
+            st.markdown(pdf_display, unsafe_allow_html=True)
         
         st.session_state["created"] = True
 
@@ -403,4 +411,5 @@ with tab2:
     add_user()
 
 with tab3:
-    remove_user()
+    pass
+    #remove_user()
